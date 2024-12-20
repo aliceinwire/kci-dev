@@ -13,3 +13,23 @@
 
 #### **Make your code pass automated code checks**
 
+The best way for developing kci-dev is by using [virtualenv](https://virtualenv.pypa.io/en/latest/) and [poetry](https://python-poetry.org/)
+
+```shell
+virtualenv .venv
+source .venv/bin/activate
+pip install poetry
+poetry install
+```
+
+For executing the automated code checks
+
+```shell
+poe check
+```
+
+This checks can be automated during git commit  
+Just append `poe check` to your pre-commit file
+```shell
+echo "poe check" >> .git/hooks/pre-commit
+```
