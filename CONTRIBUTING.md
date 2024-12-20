@@ -9,7 +9,7 @@
 
 * Open a new GitHub pull request with the patch.
 * Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
-* Ensure that the PR code pass the GitHub automatic checks, if you don't know how check here under.
+* Ensure that the PR code pass the GitHub automatic checks, you can use the following suggested [workflow](#make-your-code-pass-automated-code-checks) for be sure everything pass.
 
 #### **Make your code pass automated code checks**
 
