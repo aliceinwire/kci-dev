@@ -19,15 +19,14 @@ contentDir = "docs/"
   useHLJS = true
   defaultTheme = "auto"
 
-  [params.search]
-    enable = true
-    type = "lunr"
-    contentLength = 4000
-    placeholder = ""
-    maxResultLength = 10
-    snippetLength = 50
-    highlightTag = "em"
-    absoluteURL = false
+  [params.fuseOpts]
+    isCaseSensitive = false
+    shouldSort = true
+    location = 0
+    distance = 1000
+    threshold = 0.4
+    minMatchCharLength = 0
+    keys = [ "title", "permalink", "summary", "content" ]
 
 [menu]
   [[menu.main]]
@@ -64,3 +63,12 @@ contentDir = "docs/"
     name = "maestro-results"
     url = "maestro-results/"
     weight = 20
+
+  [[menu.main]]
+    identifier = "search"
+    name = "🔍search"
+    url = "/search/"
+    weight = 30
+
+[outputs]
+home = [ "HTML", "RSS", "JSON" ]
