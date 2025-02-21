@@ -4,9 +4,9 @@ title = 'kci-dev'
 description = 'Stand alone tool for Linux Kernel developers and maintainers to interact with KernelCI'
 contentDir = "docs/"
 
-minify:
-  disableXML: true
-  minifyOutput: true
+[minify]
+  disableXML = true
+  minifyOutput = true
 
 [params]
   ShowReadingTime = true
@@ -18,17 +18,18 @@ minify:
   ShowWordCount = true
   useHLJS = true
   defaultTheme = "auto"
-  # for search
-  # https://fusejs.io/api/options.html
-  fuseOpts:
-    isCaseSensitive: false
-    shouldSort: true
-    location: 0
-    distance: 1000
-    threshold: 0.4
-    minMatchCharLength: 0
-    limit: 10 # refer: https://www.fusejs.io/api/methods.html#search
-    keys: ["title", "permalink", "summary", "content"]
+
+# for search
+# https://fusejs.io/api/options.html
+[params.fuseOpts]
+  isCaseSensitive = false
+  shouldSort = true
+  location = 0
+  distance = 1000
+  threshold = 0.4
+  minMatchCharLength = 0
+  limit = 10 # refer: https://www.fusejs.io/api/methods.html#search
+  keys = ["title", "permalink", "summary", "content"]
 
 [menu]
   [[menu.main]]
