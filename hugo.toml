@@ -4,17 +4,8 @@ title = 'kci-dev'
 description = 'Stand alone tool for Linux Kernel developers and maintainers to interact with KernelCI'
 contentDir = "docs/"
 
-pygmentsCodeFences = true
-pygmentsUseClasses = false
-pygmentsUseClassic = false
+pygmentsUseClasses = true
 pygmentsStyle = "monokai"
-
-[markup]
-  [markup.goldmark]
-    [markup.goldmark.renderer]
-      unsafe = true
-  [markup.highlight]
-      style = "monokai"
 
 [params.ui]
 sidebar_search_disable = true
