@@ -2,8 +2,8 @@ name: Deploy Hugo site to Pages
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - v*
 
 permissions:
   contents: read
@@ -44,7 +44,7 @@ jobs:
           npm install -D autoprefixer
           npm install -D postcss-cli
           npm install -D postcss
-      - name: Build with Hugo
+      - name: Build with Hugo latest
         env:
           HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
           HUGO_ENVIRONMENT: production
@@ -57,7 +57,15 @@ jobs:
             --gc \
             --theme PaperMod \
             --minify \
-            --baseURL "${{ steps.pages.outputs.base_url }}/"          
+            --baseURL "${{ steps.pages.outputs.base_url }}/" \
+            --destination ./public/${{ github.ref_name }}
+      - name: Build with Hugo version
+        env:
+          HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
+          HUGO_ENVIRONMENT: production
+          TZ: America/Los_Angeles
+        run: |
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
