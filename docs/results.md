@@ -4,6 +4,20 @@ date = 2024-12-10T07:07:07+01:00
 description = 'Fetch results from the KernelCI ecosystem.'
 +++
 
+## Regression comparison and CI gates
+
+```shell
+kci-dev results compare --giturl URL --branch BRANCH --format json BASE HEAD
+kci-dev results gate --giturl URL --branch BRANCH --base BASE --head HEAD \
+  --fail-on regression --format json
+```
+
+Reports classify executions as `regression`, `fixed`, `unstable`,
+`persistent_fail`, `new`, or `missing`, while preserving duplicates. Identity
+includes origin, platform, architecture, compiler, configuration, and path.
+Exit status is 0 without a policy violation, 1 for a policy violation, and 2
+when API or infrastructure failures make the result incomplete.
+
 `kci-dev` pulls from our Dashboard API. As of now, it is an EXPERIMENTAL tooling under development with close collaboration from Linux kernel maintainers.
 
 > KNOWN ISSUE: The Dashboard endpoint we are using returns a file of a few megabytes in size, so download may take

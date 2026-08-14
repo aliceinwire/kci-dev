@@ -79,6 +79,23 @@ def get_summary(
 
 
 @tool_errors
+def compare_checkouts(
+    giturl: str,
+    branch: str,
+    base: str,
+    head: str,
+    origin: str = "maestro",
+):
+    """Compare two checkouts, classifying regressions, fixes and unstable tests.
+
+    The returned report preserves duplicate executions and includes known issue
+    ids for failing/regressing results.  ``incomplete`` means it must not be
+    treated as a successful CI gate.
+    """
+    return _current_client().compare_results(base, head, giturl, branch, origin)
+
+
+@tool_errors
 def list_commits(giturl: str, branch: str, commit: str, origin: str = "maestro"):
     """List recent checkouts of a tree with per-commit result counts.
 
@@ -294,6 +311,7 @@ def get_issue_tests(
 READ_ONLY_TOOLS = (
     list_trees,
     get_summary,
+    compare_checkouts,
     list_commits,
     list_builds,
     list_boots,
