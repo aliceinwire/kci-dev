@@ -106,7 +106,7 @@ def git_exec_getcommit(cmd):
         kci_err(f"git command answer length failed: {lines}")
         sys.exit(1)
     # is it last bisect?: "is the first bad commit"
-    if "is the first bad commit" in output:
+    if re.search(r"is the first '?bad'? commit", output):
         first_bad = output.split()[0]
         logging.info("Bisection complete - found first bad commit")
         click.secho(f"First bad commit: {first_bad}", fg="green")
