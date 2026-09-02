@@ -7,7 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        include:
+          - python-version: "3.12"
+            tox-env: py312
+          - python-version: "3.13"
+            tox-env: py313
+          - python-version: "3.14"
+            tox-env: py314
     steps:
       - uses: actions/checkout@v4
       - name: Install Python ${{ matrix.python-version }}
@@ -36,4 +42,4 @@ jobs:
       - name: Isort check
         run: poetry run isort . --profile black --check --diff
       - name: Tox check (pytest)
-        run: poetry run tox
+        run: poetry run tox -e ${{ matrix.tox-env }}
