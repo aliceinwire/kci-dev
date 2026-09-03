@@ -390,7 +390,14 @@ def boot(op_id, download_logs, use_json):
     "--format", "output_format", type=click.Choice(["human", "json"]), default="human"
 )
 @click.option("--json", "use_json", is_flag=True, hidden=True)
-def compare(origin, giturl, branch, latest, commits, output_format, use_json):
+@click.option(
+    "--include-issues",
+    is_flag=True,
+    help="Look up known issues (one request per regression/persistent failure)",
+)
+def compare(
+    origin, giturl, branch, latest, commits, output_format, use_json, include_issues
+):
     """Compare test results between commits with summary and regressions.
 
     Compares test results between commits showing summary statistics
@@ -416,7 +423,12 @@ def compare(origin, giturl, branch, latest, commits, output_format, use_json):
         raise click.UsageError("exactly BASE and HEAD commits are required")
     try:
         report = KernelCIClient().compare_results(
-            commits[0], commits[1], giturl, branch, origin
+            commits[0],
+            commits[1],
+            giturl,
+            branch,
+            origin,
+            include_issues=include_issues,
         )
     except KciDevError as exc:
         if json_output:

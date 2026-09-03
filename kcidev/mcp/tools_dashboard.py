@@ -85,14 +85,17 @@ def compare_checkouts(
     base: str,
     head: str,
     origin: str = "maestro",
+    include_issues: bool = False,
 ):
     """Compare two checkouts, classifying regressions, fixes and unstable tests.
-
-    The returned report preserves duplicate executions and includes known issue
-    ids for failing/regressing results.  ``incomplete`` means it must not be
-    treated as a successful CI gate.
+    The returned report preserves duplicate executions. Set ``include_issues``
+    to look up known issue ids for failing/regressing results; this can require
+    one additional request per result. ``incomplete`` means the report must not
+    be treated as a successful CI gate.
     """
-    return _current_client().compare_results(base, head, giturl, branch, origin)
+    return _current_client().compare_results(
+        base, head, giturl, branch, origin, include_issues=include_issues
+    )
 
 
 @tool_errors

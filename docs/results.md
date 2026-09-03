@@ -10,6 +10,7 @@ description = 'Fetch results from the KernelCI ecosystem.'
 kci-dev results compare --giturl URL --branch BRANCH --format json BASE HEAD
 kci-dev results gate --giturl URL --branch BRANCH --base BASE --head HEAD \
   --fail-on regression --format json
+kci-dev results compare --giturl URL --branch BRANCH --include-issues BASE HEAD
 ```
 
 Reports classify executions as `regression`, `fixed`, `unstable`,
@@ -17,6 +18,9 @@ Reports classify executions as `regression`, `fixed`, `unstable`,
 includes origin, platform, architecture, compiler, configuration, and path.
 Exit status is 0 without a policy violation, 1 for a policy violation, and 2
 when API or infrastructure failures make the result incomplete.
+
+Known-issue lookup is opt-in with `--include-issues`, since it makes one
+additional Dashboard request for each regression and persistent failure.
 
 `kci-dev` pulls from our Dashboard API. As of now, it is an EXPERIMENTAL tooling under development with close collaboration from Linux kernel maintainers.
 

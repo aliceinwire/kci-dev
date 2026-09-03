@@ -502,9 +502,13 @@ class KernelCIClient:
         )
 
     def compare_results(
-        self, base, head, giturl, branch, origin="maestro", include_issues=True
+        self, base, head, giturl, branch, origin="maestro", include_issues=False
     ):
-        """Compare two dashboard checkouts and return a CI-grade report dict."""
+        """Compare two dashboard checkouts and return a CI-grade report dict.
+
+        Issue lookup is disabled by default because it requires one additional
+        Dashboard request for every regression and persistent failure.
+        """
 
         def checkout(commit):
             return {
