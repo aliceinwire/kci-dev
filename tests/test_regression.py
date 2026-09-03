@@ -115,6 +115,49 @@ def test_report_pairs_duplicate_results_independently_of_api_order():
     assert report.items[0]["head_id"] == "head-fail"
 
 
+def test_report_marks_unpaired_duplicate_as_missing():
+    report = RegressionReport.compare(
+        "base",
+        "head",
+        {
+            "tests": [
+                result("base-first", "PASS"),
+                result("base-second", "PASS"),
+            ]
+        },
+        {"tests": [result("head-only", "PASS")]},
+    )
+
+    assert report.counts == {
+        "regression": 0,
+        "fixed": 0,
+        "unstable": 0,
+        "persistent_fail": 0,
+        "new": 0,
+        "missing": 1,
+    }
+    assert report.items == [
+        {
+            "category": "missing",
+            "identity": {
+                "kind": "test",
+                "origin": "maestro",
+                "platform": "qemu",
+                "architecture": "arm64",
+                "compiler": "gcc-14",
+                "config": "defconfig",
+                "path": "suite.case",
+            },
+            "occurrence": 1,
+            "base_status": "PASS",
+            "head_status": None,
+            "base_id": "base-second",
+            "head_id": None,
+            "known_issues": [],
+        }
+    ]
+
+
 def test_history_categories_only_apply_to_matching_head_status():
     key = ("maestro", "qemu", "arm64", "gcc-14", "defconfig", "suite.case")
     regression_history = {"regression": {key}, "fixed": set(), "unstable": set()}
@@ -155,6 +198,20 @@ def test_history_categories_only_apply_to_matching_head_status():
             result("old", "FAIL"), result("new", "FAIL"), key, fixed_history
         )
         == "persistent_fail"
+    )
+    assert (
+        RegressionReport._classify(
+            result("old", "PASS"), result("new", "PASS"), key, fixed_history
+        )
+        == "fixed"
+    )
+
+    unstable_history = {"regression": set(), "fixed": set(), "unstable": {key}}
+    assert (
+        RegressionReport._classify(
+            result("old", "PASS"), result("new", "PASS"), key, unstable_history
+        )
+        == "unstable"
     )
 
 
@@ -272,3 +329,218 @@ def test_gate_handles_abort_while_resolving_latest_checkout(monkeypatch):
 
     assert result.exit_code == 2
     assert json.loads(result.stdout) == {"error": "", "incomplete": True}
+
+
+def _report(**counts):
+    return {
+        "base": "base",
+        "head": "head",
+        "counts": {
+            category: counts.get(category, 0)
+            for category in (
+                "regression",
+                "fixed",
+                "unstable",
+                "persistent_fail",
+                "new",
+                "missing",
+            )
+        },
+        "incomplete": counts.get("incomplete", False),
+        "items": [],
+    }
+
+
+def test_gate_parses_fail_on_list_and_exits_for_selected_category(monkeypatch):
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.compare_results",
+        lambda *args, **kwargs: _report(fixed=1),
+    )
+
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "gate",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "--base",
+            "base",
+            "--head",
+            "head",
+            "--fail-on",
+            " regression, , fixed,regression ",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "fixed: 1" in result.stdout
+
+
+def test_gate_exits_zero_when_policy_has_no_violations(monkeypatch):
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.compare_results",
+        lambda *args, **kwargs: _report(fixed=1),
+    )
+
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "gate",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "--base",
+            "base",
+            "--head",
+            "head",
+            "--fail-on",
+            "regression",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["counts"]["fixed"] == 1
+
+
+def test_gate_exits_two_for_incomplete_report_before_policy(monkeypatch):
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.compare_results",
+        lambda *args, **kwargs: _report(regression=1, incomplete=True),
+    )
+
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "gate",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "--base",
+            "base",
+            "--head",
+            "head",
+        ],
+    )
+
+    assert result.exit_code == 2
+
+
+def test_gate_requires_base_and_head_together():
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "gate",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "--base",
+            "base",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "provide both --base and --head, or neither" in result.output
+
+
+def test_gate_resolves_latest_pair_from_history_dictionary(monkeypatch):
+    monkeypatch.setattr(
+        "kcidev.subcommands.results.set_giturl_branch_commit",
+        lambda *args, **kwargs: ("resolved-url", "resolved-branch", "latest"),
+    )
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.get_commits_history",
+        lambda *args, **kwargs: {
+            "commits": [
+                {"git_commit_hash": "head-from-history"},
+                {"git_commit_hash": "base-from-history"},
+            ]
+        },
+    )
+    compared = {}
+
+    def compare(_client, base, head, giturl, branch, origin):
+        compared["args"] = (base, head, giturl, branch, origin)
+        return _report()
+
+    monkeypatch.setattr("kcidev.api.KernelCIClient.compare_results", compare)
+
+    result = CliRunner().invoke(
+        get_cli(),
+        ["results", "gate", "--giturl", "url", "--branch", "main"],
+    )
+
+    assert result.exit_code == 0
+    assert compared["args"] == (
+        "base-from-history",
+        "head-from-history",
+        "resolved-url",
+        "resolved-branch",
+        "maestro",
+    )
+
+
+def test_gate_accepts_list_history(monkeypatch):
+    monkeypatch.setattr(
+        "kcidev.subcommands.results.set_giturl_branch_commit",
+        lambda *args, **kwargs: ("url", "main", "latest"),
+    )
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.get_commits_history",
+        lambda *args, **kwargs: [
+            {"git_commit_hash": "head"},
+            {"git_commit_hash": "base"},
+        ],
+    )
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.compare_results",
+        lambda *args, **kwargs: _report(),
+    )
+
+    result = CliRunner().invoke(
+        get_cli(),
+        ["results", "gate", "--giturl", "url", "--branch", "main"],
+    )
+
+    assert result.exit_code == 0
+
+
+def test_gate_exits_two_when_history_has_fewer_than_two_commits(monkeypatch):
+    monkeypatch.setattr(
+        "kcidev.subcommands.results.set_giturl_branch_commit",
+        lambda *args, **kwargs: ("url", "main", "latest"),
+    )
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.get_commits_history",
+        lambda *args, **kwargs: {"commits": [{"git_commit_hash": "only"}]},
+    )
+
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "gate",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert json.loads(result.stdout) == {
+        "error": "fewer than two checkouts are available",
+        "incomplete": True,
+    }
