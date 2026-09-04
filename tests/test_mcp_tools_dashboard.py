@@ -214,3 +214,71 @@ def test_get_summary_detail_returns_full_payload(monkeypatch):
         detail=True,
     )
     assert result == SUMMARY_PAYLOAD
+
+
+def test_get_test_issues_fetches_dashboard(monkeypatch):
+    get = _mock_get(monkeypatch, [{"id": "issue1"}])
+    result = tools_dashboard.get_test_issues("maestro:t1")
+    assert result == [{"id": "issue1"}]
+    assert "test/maestro:t1/issues" in get.call_args[0][0]
+
+
+def test_get_build_issues_fetches_dashboard(monkeypatch):
+    get = _mock_get(monkeypatch, [{"id": "issue2"}])
+    result = tools_dashboard.get_build_issues("maestro:b1")
+    assert result == [{"id": "issue2"}]
+    assert "build/maestro:b1/issues" in get.call_args[0][0]
+
+
+def test_get_log_returns_client_payload(monkeypatch):
+    from kcidev.api import KernelCIClient
+
+    monkeypatch.setattr(
+        KernelCIClient,
+        "get_log",
+        lambda self, tid, max_bytes=16384, tail=True: {
+            "test_id": tid,
+            "truncated": False,
+            "text": "log body",
+        },
+    )
+    result = tools_dashboard.get_log("maestro:t1")
+    assert result["text"] == "log body"
+    assert result["test_id"] == "maestro:t1"
+
+
+def test_get_test_issues_returns_empty_when_none_are_tracked(monkeypatch):
+    _mock_get(monkeypatch, {"error": "No issues were found for this test"})
+    assert tools_dashboard.get_test_issues("maestro:t1") == []
+
+
+def test_get_build_issues_returns_empty_when_none_are_tracked(monkeypatch):
+    _mock_get(monkeypatch, {"error": "No issues found for this build"})
+    assert tools_dashboard.get_build_issues("maestro:b1") == []
+
+
+def test_get_test_issues_still_reports_other_errors(monkeypatch):
+    _mock_get(monkeypatch, {"error": "Test not found"})
+    with pytest.raises(ToolExecutionError):
+        tools_dashboard.get_test_issues("maestro:nope")
+
+
+def test_get_issue_tests_returns_empty_when_none_are_tracked(monkeypatch):
+    get = _mock_get(monkeypatch, {"error": "No tests found for this issue"})
+    result = tools_dashboard.get_issue_tests("maestro:i1")
+    assert result["tests"] == []
+    assert result["matched"] == 0
+    assert get.called
+
+
+def test_get_issue_builds_returns_empty_when_none_are_tracked(monkeypatch):
+    _mock_get(monkeypatch, {"error": "No builds found for this issue"})
+    result = tools_dashboard.get_issue_builds("maestro:i1")
+    assert result["builds"] == []
+    assert result["matched"] == 0
+
+
+def test_get_issue_tests_still_reports_other_errors(monkeypatch):
+    _mock_get(monkeypatch, {"error": "Issue not found"})
+    with pytest.raises(ToolExecutionError):
+        tools_dashboard.get_issue_tests("maestro:nope")

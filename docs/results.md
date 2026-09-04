@@ -7,6 +7,7 @@ description = 'Fetch results from the KernelCI ecosystem.'
 ## Regression comparison and CI gates
 
 ```shell
+kci-dev results compare --giturl URL --branch BRANCH --format json
 kci-dev results compare --giturl URL --branch BRANCH --format json BASE HEAD
 kci-dev results gate --giturl URL --branch BRANCH --base BASE --head HEAD \
   --fail-on regression --format json
@@ -138,7 +139,12 @@ Compare test results between commits with summary statistics and regressions.
 
 This command compares test results between commits showing summary statistics for both commits and identifying tests that transitioned from PASS to FAIL status. This helps identify genuine regressions while distinguishing them from boot-related infrastructure issues.
 
-By default, it compares the latest two commits from history. You can also specify two specific commit hashes to compare.
+With no positional commits, it fetches checkout history and compares the
+previous checkout (BASE, history index 1) with the latest checkout (HEAD,
+history index 0). You can instead specify exactly two commit hashes as
+`BASE HEAD`; one commit or more than two commits is invalid. The existing
+`--latest` option remains accepted for compatibility and selects the same
+latest-two behavior when no commits are given.
 
 Example:
 

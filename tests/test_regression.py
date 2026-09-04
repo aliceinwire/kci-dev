@@ -1,6 +1,7 @@
 import json
 
 import click
+import pytest
 from click.testing import CliRunner
 
 from kcidev.libs.regression import RegressionReport
@@ -275,6 +276,149 @@ def test_compare_json_is_one_document_and_regressions_exit_one(monkeypatch):
     )
     assert result.exit_code == 1
     assert json.loads(result.stdout)["counts"]["regression"] == 1
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        [
+            {"git_commit_hash": "head-from-history"},
+            {"git_commit_hash": "base-from-history"},
+        ],
+        {
+            "commits": [
+                {"git_commit_hash": "head-from-history"},
+                {"git_commit_hash": "base-from-history"},
+            ]
+        },
+    ],
+)
+def test_compare_without_commits_resolves_latest_pair(monkeypatch, history):
+    monkeypatch.setattr(
+        "kcidev.subcommands.results.set_giturl_branch_commit",
+        lambda *args, **kwargs: ("resolved-url", "resolved-branch", "latest"),
+    )
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.get_commits_history",
+        lambda *args, **kwargs: history,
+    )
+    compared = {}
+
+    def compare(_client, base, head, giturl, branch, origin, **kwargs):
+        compared["args"] = (base, head, giturl, branch, origin)
+        return _report()
+
+    monkeypatch.setattr("kcidev.api.KernelCIClient.compare_results", compare)
+
+    result = CliRunner().invoke(
+        get_cli(),
+        ["results", "compare", "--giturl", "url", "--branch", "main"],
+    )
+
+    assert result.exit_code == 0
+    assert compared["args"] == (
+        "base-from-history",
+        "head-from-history",
+        "resolved-url",
+        "resolved-branch",
+        "maestro",
+    )
+
+
+@pytest.mark.parametrize("commits", [["only"], ["one", "two", "three"]])
+def test_compare_rejects_invalid_positional_commit_counts(commits):
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "compare",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            *commits,
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "provide either zero commits or exactly BASE and HEAD" in result.output
+
+
+def test_compare_preserves_two_explicit_commits_without_history(monkeypatch):
+    def unexpected_history(*args, **kwargs):
+        raise AssertionError("explicit commits should not fetch history")
+
+    monkeypatch.setattr(
+        "kcidev.api.KernelCIClient.get_commits_history", unexpected_history
+    )
+    compared = {}
+
+    def compare(_client, base, head, *args, **kwargs):
+        compared["commits"] = (base, head)
+        return _report()
+
+    monkeypatch.setattr("kcidev.api.KernelCIClient.compare_results", compare)
+
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "compare",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "base",
+            "head",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert compared["commits"] == ("base", "head")
+
+
+@pytest.mark.parametrize(
+    ("history", "message"),
+    [
+        (
+            {"commits": [{"git_commit_hash": "only"}]},
+            "fewer than two checkouts are available",
+        ),
+        (None, "history unavailable"),
+    ],
+)
+def test_compare_json_history_failure_is_one_document(monkeypatch, history, message):
+    monkeypatch.setattr(
+        "kcidev.subcommands.results.set_giturl_branch_commit",
+        lambda *args, **kwargs: ("url", "main", "latest"),
+    )
+
+    def get_history(*args, **kwargs):
+        if history is None:
+            from kcidev.api import KciDevError
+
+            raise KciDevError(message)
+        return history
+
+    monkeypatch.setattr("kcidev.api.KernelCIClient.get_commits_history", get_history)
+
+    result = CliRunner().invoke(
+        get_cli(),
+        [
+            "results",
+            "compare",
+            "--giturl",
+            "url",
+            "--branch",
+            "main",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert json.loads(result.stdout) == {"error": message, "incomplete": True}
+    assert result.stdout.count("\n") == 1
 
 
 def test_gate_rejects_unknown_fail_on_categories_before_comparison(monkeypatch):

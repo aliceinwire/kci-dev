@@ -50,6 +50,25 @@ from kcidev.subcommands.results.parser import (
 )
 
 
+def _resolve_latest_two(client, origin, giturl, branch):
+    """Return the previous and latest checkout from Dashboard history."""
+    from kcidev.api import KciDevError
+
+    giturl, branch, latest = set_giturl_branch_commit(
+        origin, giturl, branch, None, True, None
+    )
+    history = client.get_commits_history(origin, giturl, branch, latest)
+    commits = history if isinstance(history, list) else history.get("commits", [])
+    if len(commits) < 2:
+        raise KciDevError("fewer than two checkouts are available")
+    return (
+        giturl,
+        branch,
+        commits[1]["git_commit_hash"],
+        commits[0]["git_commit_hash"],
+    )
+
+
 @click.group(
     help="""Query and display test results from the KernelCI dashboard.
 
@@ -405,32 +424,42 @@ def compare(
     This helps identify genuine regressions while distinguishing them
     from boot-related infrastructure issues.
 
-    By default, compares the latest two commits from history. You can also
-    specify two specific commit hashes to compare.
+    With no COMMITS, compares history index 1 (BASE) with index 0 (HEAD).
+    Alternatively, provide exactly two commit hashes as BASE HEAD.
+    --latest remains accepted for compatibility with latest-two comparisons.
 
     \b
     Examples:
       # Compare latest two commits
-      kci-dev results compare --giturl https://git.kernel.org/...
+      kci-dev results compare --giturl https://git.kernel.org/... --branch main
 
       # Compare specific commits
-      kci-dev results compare --giturl https://git.kernel.org/... abc123 def456
+      kci-dev results compare --giturl https://git.kernel.org/... --branch main abc123 def456
     """
     from kcidev.api import KciDevError, KernelCIClient
 
     json_output = use_json or output_format == "json"
-    if len(commits) != 2:
-        raise click.UsageError("exactly BASE and HEAD commits are required")
+    if len(commits) not in (0, 2):
+        raise click.UsageError(
+            "provide either zero commits or exactly BASE and HEAD commits"
+        )
     try:
-        report = KernelCIClient().compare_results(
-            commits[0],
-            commits[1],
+        client = KernelCIClient()
+        if commits:
+            base, head = commits
+        else:
+            giturl, branch, base, head = _resolve_latest_two(
+                client, origin, giturl, branch
+            )
+        report = client.compare_results(
+            base,
+            head,
             giturl,
             branch,
             origin,
             include_issues=include_issues,
         )
-    except KciDevError as exc:
+    except (KciDevError, click.Abort) as exc:
         if json_output:
             click.echo(json.dumps({"error": str(exc), "incomplete": True}))
         raise click.exceptions.Exit(2) from exc
@@ -439,7 +468,7 @@ def compare(
         click.echo(json.dumps(report, sort_keys=True))
 
     else:
-        click.echo(f"Compared {commits[0]} -> {commits[1]}")
+        click.echo(f"Compared {base} -> {head}")
         for category, count in report["counts"].items():
             click.echo(f"  {category}: {count}")
     if report["incomplete"]:
@@ -478,16 +507,9 @@ def gate(origin, giturl, branch, base, head, fail_on, output_format):
         if bool(base) != bool(head):
             raise click.UsageError("provide both --base and --head, or neither")
         if not base:
-            giturl, branch, latest = set_giturl_branch_commit(
-                origin, giturl, branch, None, True, None
+            giturl, branch, base, head = _resolve_latest_two(
+                client, origin, giturl, branch
             )
-            history = client.get_commits_history(origin, giturl, branch, latest)
-            commits = (
-                history if isinstance(history, list) else history.get("commits", [])
-            )
-            if len(commits) < 2:
-                raise KciDevError("fewer than two checkouts are available")
-            head, base = commits[0]["git_commit_hash"], commits[1]["git_commit_hash"]
         report = client.compare_results(base, head, giturl, branch, origin)
     except (KciDevError, click.Abort) as exc:
         if output_format == "json":
